@@ -1,0 +1,64 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>インベーダー風</title><style>
+body{margin:0;background:#000;color:#fff;font-family:"Courier New",monospace;display:flex;flex-direction:column;align-items:center;touch-action:none;user-select:none;-webkit-user-select:none}
+h1{color:#ff0;font-size:22px;margin:8px;text-shadow:3px 3px #f0f;letter-spacing:2px}
+#hud{color:#0ff;margin:4px;font-size:16px;min-height:20px}
+#wrap{position:relative}
+canvas{display:block;background:#000;border:4px solid #33f;image-rendering:pixelated;max-width:94vw;max-height:62vh;touch-action:none}
+#ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.8);text-align:center;padding:8px;box-sizing:border-box}
+#msg{color:#ff0;font-size:20px;line-height:1.6}
+button{font-family:inherit;font-size:18px;background:#111;color:#ff0;border:3px solid #f0f;padding:10px 14px;margin:3px;border-radius:0}
+button:active{background:#f0f;color:#000}
+.pad{display:flex;gap:4px;margin:6px;flex-wrap:wrap;justify-content:center}
+.help{font-size:12px;color:#aaa;line-height:1.6}
+a{color:#0f0;margin:6px}
+</style></head><body><h1>インベーダー風</h1><div id="hud"></div><div id="wrap"><canvas id="c" width="360" height="480"></canvas><div id="ov"><p id="msg"></p><button id="go">スタート</button><p class="help">←→ 移動　スペース 発射<br>スマホ：画面をなぞって移動・タップで発射</p></div></div>
+<div class="pad"><button data-k="L">←</button><button data-k="A">発射</button><button data-k="R">→</button></div><a href="index.html">← メニューへもどる</a>
+<script>
+const cv=document.getElementById('c'),g=cv.getContext('2d'),ov=document.getElementById('ov'),msgEl=document.getElementById('msg'),goB=document.getElementById('go');
+const hud=t=>document.getElementById('hud').textContent=t;
+const keys={};let running=false;
+function showOv(m,b){msgEl.innerHTML=m;goB.textContent=b;ov.style.display='flex';running=false}
+goB.onclick=()=>{ov.style.display='none';for(const k in keys)keys[k]=0;start();running=true};
+const KM={ArrowLeft:'L',ArrowRight:'R',ArrowUp:'U',ArrowDown:'D',' ':'A',x:'A',X:'A',z:'B',Z:'B',Enter:'S'};
+addEventListener('keydown',e=>{const k=KM[e.key];if(!k)return;e.preventDefault();if(!running){if(k==='S'||k==='A')goB.click();return}keys[k]=1;press(k)});
+addEventListener('keyup',e=>{const k=KM[e.key];if(k)keys[k]=0});
+document.querySelectorAll('.pad button').forEach(b=>{const k=b.dataset.k;
+const dn=e=>{e.preventDefault();if(!running){goB.click();return}keys[k]=1;press(k)};const up=e=>{e.preventDefault();keys[k]=0};
+b.addEventListener('touchstart',dn,{passive:false});b.addEventListener('mousedown',dn);b.addEventListener('touchend',up);b.addEventListener('touchcancel',up);b.addEventListener('mouseup',up);b.addEventListener('mouseleave',up)});
+let ts0=null;const tx=t=>{const r=cv.getBoundingClientRect();return (t.clientX-r.left)*cv.width/r.width};
+cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];ts0={x:t.clientX,y:t.clientY};if(running&&typeof onTouchX==='function')onTouchX(tx(t))},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();if(running&&typeof onTouchX==='function')onTouchX(tx(e.touches[0]))},{passive:false});
+cv.addEventListener('touchend',e=>{e.preventDefault();if(!ts0||!running)return;const t=e.changedTouches[0],dx=t.clientX-ts0.x,dy=t.clientY-ts0.y;ts0=null;
+if(Math.abs(dx)<15&&Math.abs(dy)<15)press('A');else if(typeof onTouchX!=='function'){press(Math.abs(dx)>Math.abs(dy)?(dx>0?'R':'L'):(dy>0?'D':'U'))}},{passive:false});
+</script>
+<script>
+let pl,al,dx,shots,es,score,lives,cool,wave,inv,boom=[];
+const SPR=[["..X.....X..","...X...X...","..XXXXXXX..",".XX.XXX.XX.","XXXXXXXXXXX","X.XXXXXXX.X","X.X.....X.X","...XX.XX..."],["....XXX....",".XXXXXXXXX.","XXXXXXXXXXX","XXX..X..XXX","XXXXXXXXXXX","..XX...XX..",".XX.XXX.XX.","XX.......XX"]];
+const AC=['#f3f','#f3f','#3ff','#3ff','#3f3'];
+function start(){score=0;lives=3;wave=1;mkA();pl=180;shots=[];es=[];cool=0;inv=0}
+function mkA(){al=[];for(let r=0;r<5;r++)for(let c=0;c<8;c++)al.push({x:40+c*36,y:60+r*30,r,a:1});dx=1}
+function fire(){if(cool<=0&&shots.length<2){shots.push({x:pl,y:440});cool=15}}
+function press(k){if(k=='A')fire()}
+function onTouchX(x){pl=x}
+function over(){draw();showOv('ゲームオーバー<br>スコア '+score,'リトライ')}
+function loop(t){requestAnimationFrame(loop);if(!running)return;
+if(keys.L)pl-=4;if(keys.R)pl+=4;pl=Math.max(12,Math.min(348,pl));if(keys.A)fire();cool--;if(inv>0)inv--;
+shots.forEach(s=>s.y-=8);shots=shots.filter(s=>s.y>0);
+const live=al.filter(a=>a.a);const sp=0.3+(40-live.length)*0.04+wave*0.15;let edge=false;
+live.forEach(a=>{a.x+=dx*sp;if(a.x<14||a.x>346)edge=true});if(edge){dx=-dx;live.forEach(a=>{a.y+=12;a.x+=dx*sp})}
+if(live.length&&Math.random()<0.015+wave*0.005){const a=live[Math.random()*live.length|0];es.push({x:a.x,y:a.y+10})}
+es.forEach(s=>s.y+=3.5+wave*0.3);es=es.filter(s=>s.y<480);
+for(const s of shots)for(const a of live)if(a.a&&Math.abs(s.x-a.x)<13&&Math.abs(s.y-a.y)<10){a.a=0;s.y=-99;score+=(5-a.r)*10;boom.push({x:a.x,y:a.y,t:12})}
+if(!inv)for(const s of es)if(Math.abs(s.x-pl)<13&&s.y>436&&s.y<460){lives--;es=[];inv=90;boom.push({x:pl,y:448,t:20});if(lives<=0)return over();break}
+if(live.some(a=>a.a&&a.y>425))return over();
+if(al.every(a=>!a.a)){wave++;mkA();es=[]}
+draw(t)}
+function draw(t=0){g.fillStyle='#000';g.fillRect(0,0,360,480);const f=(t/400|0)%2;
+al.forEach(a=>{if(!a.a)return;g.fillStyle=AC[a.r];SPR[f].forEach((row,y)=>{for(let x=0;x<11;x++)if(row[x]=='X')g.fillRect(a.x-11+x*2,a.y-8+y*2,2,2)})});
+if(!(inv&&(inv>>3)%2)){g.fillStyle='#3f3';g.fillRect(pl-13,446,26,8);g.fillRect(pl-3,440,6,6)}
+g.fillStyle='#fff';shots.forEach(s=>g.fillRect(s.x-1,s.y-6,3,10));g.fillStyle='#f63';es.forEach(s=>g.fillRect(s.x-2,s.y-5,4,10));
+boom=boom.filter(b=>b.t-->0);g.fillStyle='#ff0';boom.forEach(b=>{for(let i=0;i<8;i++)g.fillRect(b.x+Math.cos(i)*(14-b.t),b.y+Math.sin(i*2)*(14-b.t),3,3)});
+g.fillStyle='#3f3';g.fillRect(0,462,360,2);hud('スコア '+score+'  のこり '+'♥'.repeat(Math.max(0,lives))+'  ウェーブ '+wave)}
+showOv('インベーダー風<br>せめてくる敵をうちおとせ！','スタート');requestAnimationFrame(loop);
+
+</script></body></html>

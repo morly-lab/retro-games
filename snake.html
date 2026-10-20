@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>スネーク</title><style>
+body{margin:0;background:#000;color:#fff;font-family:"Courier New",monospace;display:flex;flex-direction:column;align-items:center;touch-action:none;user-select:none;-webkit-user-select:none}
+h1{color:#ff0;font-size:22px;margin:8px;text-shadow:3px 3px #f0f;letter-spacing:2px}
+#hud{color:#0ff;margin:4px;font-size:16px;min-height:20px}
+#wrap{position:relative}
+canvas{display:block;background:#000;border:4px solid #33f;image-rendering:pixelated;max-width:94vw;max-height:62vh;touch-action:none}
+#ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.8);text-align:center;padding:8px;box-sizing:border-box}
+#msg{color:#ff0;font-size:20px;line-height:1.6}
+button{font-family:inherit;font-size:18px;background:#111;color:#ff0;border:3px solid #f0f;padding:10px 14px;margin:3px;border-radius:0}
+button:active{background:#f0f;color:#000}
+.pad{display:flex;gap:4px;margin:6px;flex-wrap:wrap;justify-content:center}
+.help{font-size:12px;color:#aaa;line-height:1.6}
+a{color:#0f0;margin:6px}
+</style></head><body><h1>スネーク</h1><div id="hud"></div><div id="wrap"><canvas id="c" width="400" height="400"></canvas><div id="ov"><p id="msg"></p><button id="go">スタート</button><p class="help">矢印キー / スワイプ / 画面ボタンで方向を変える</p></div></div>
+<div class="pad"><button data-k="L">←</button><button data-k="U">↑</button><button data-k="D">↓</button><button data-k="R">→</button></div><a href="index.html">← メニューへもどる</a>
+<script>
+const cv=document.getElementById('c'),g=cv.getContext('2d'),ov=document.getElementById('ov'),msgEl=document.getElementById('msg'),goB=document.getElementById('go');
+const hud=t=>document.getElementById('hud').textContent=t;
+const keys={};let running=false;
+function showOv(m,b){msgEl.innerHTML=m;goB.textContent=b;ov.style.display='flex';running=false}
+goB.onclick=()=>{ov.style.display='none';for(const k in keys)keys[k]=0;start();running=true};
+const KM={ArrowLeft:'L',ArrowRight:'R',ArrowUp:'U',ArrowDown:'D',' ':'A',x:'A',X:'A',z:'B',Z:'B',Enter:'S'};
+addEventListener('keydown',e=>{const k=KM[e.key];if(!k)return;e.preventDefault();if(!running){if(k==='S'||k==='A')goB.click();return}keys[k]=1;press(k)});
+addEventListener('keyup',e=>{const k=KM[e.key];if(k)keys[k]=0});
+document.querySelectorAll('.pad button').forEach(b=>{const k=b.dataset.k;
+const dn=e=>{e.preventDefault();if(!running){goB.click();return}keys[k]=1;press(k)};const up=e=>{e.preventDefault();keys[k]=0};
+b.addEventListener('touchstart',dn,{passive:false});b.addEventListener('mousedown',dn);b.addEventListener('touchend',up);b.addEventListener('touchcancel',up);b.addEventListener('mouseup',up);b.addEventListener('mouseleave',up)});
+let ts0=null;const tx=t=>{const r=cv.getBoundingClientRect();return (t.clientX-r.left)*cv.width/r.width};
+cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];ts0={x:t.clientX,y:t.clientY};if(running&&typeof onTouchX==='function')onTouchX(tx(t))},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();if(running&&typeof onTouchX==='function')onTouchX(tx(e.touches[0]))},{passive:false});
+cv.addEventListener('touchend',e=>{e.preventDefault();if(!ts0||!running)return;const t=e.changedTouches[0],dx=t.clientX-ts0.x,dy=t.clientY-ts0.y;ts0=null;
+if(Math.abs(dx)<15&&Math.abs(dy)<15)press('A');else if(typeof onTouchX!=='function'){press(Math.abs(dx)>Math.abs(dy)?(dx>0?'R':'L'):(dy>0?'D':'U'))}},{passive:false});
+</script>
+<script>
+let sn,dir,nd,food,score,best=0,last=0;
+function start(){sn=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];dir={x:1,y:0};nd=dir;score=0;place();draw()}
+function place(){do{food={x:Math.random()*20|0,y:Math.random()*20|0}}while(sn.some(s=>s.x==food.x&&s.y==food.y))}
+function press(k){const m={L:[-1,0],R:[1,0],U:[0,-1],D:[0,1]}[k];if(m&&!(m[0]==-dir.x&&m[1]==-dir.y))nd={x:m[0],y:m[1]}}
+function loop(ts){requestAnimationFrame(loop);if(!running)return;const sp=Math.max(60,140-score/5);if(ts-last<sp)return;last=ts;dir=nd;
+const h={x:sn[0].x+dir.x,y:sn[0].y+dir.y};
+if(h.x<0||h.y<0||h.x>19||h.y>19||sn.some(s=>s.x==h.x&&s.y==h.y)){best=Math.max(best,score);hud('スコア '+score+'  ハイスコア '+best);showOv('ゲームオーバー<br>スコア '+score,'リトライ');return}
+sn.unshift(h);if(h.x==food.x&&h.y==food.y){score+=10;place()}else sn.pop();draw()}
+function draw(){g.fillStyle='#000';g.fillRect(0,0,400,400);g.fillStyle='#f33';g.fillRect(food.x*20+4,food.y*20+4,12,12);g.fillStyle='#fff';g.fillRect(food.x*20+6,food.y*20+6,3,3);
+sn.forEach((s,i)=>{g.fillStyle=i?(i%2?'#0c0':'#0a0'):'#7f7';g.fillRect(s.x*20+1,s.y*20+1,18,18)});hud('スコア '+score+'  ハイスコア '+best)}
+showOv('スネーク<br>エサを食べてのびよう！<br>かべや自分にぶつかるとアウト','スタート');requestAnimationFrame(loop);
+
+</script></body></html>

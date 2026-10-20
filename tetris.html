@@ -1,0 +1,61 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>テトリス風</title><style>
+body{margin:0;background:#000;color:#fff;font-family:"Courier New",monospace;display:flex;flex-direction:column;align-items:center;touch-action:none;user-select:none;-webkit-user-select:none}
+h1{color:#ff0;font-size:22px;margin:8px;text-shadow:3px 3px #f0f;letter-spacing:2px}
+#hud{color:#0ff;margin:4px;font-size:16px;min-height:20px}
+#wrap{position:relative}
+canvas{display:block;background:#000;border:4px solid #33f;image-rendering:pixelated;max-width:94vw;max-height:62vh;touch-action:none}
+#ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.8);text-align:center;padding:8px;box-sizing:border-box}
+#msg{color:#ff0;font-size:20px;line-height:1.6}
+button{font-family:inherit;font-size:18px;background:#111;color:#ff0;border:3px solid #f0f;padding:10px 14px;margin:3px;border-radius:0}
+button:active{background:#f0f;color:#000}
+.pad{display:flex;gap:4px;margin:6px;flex-wrap:wrap;justify-content:center}
+.help{font-size:12px;color:#aaa;line-height:1.6}
+a{color:#0f0;margin:6px}
+</style></head><body><h1>テトリス風</h1><div id="hud"></div><div id="wrap"><canvas id="c" width="340" height="480"></canvas><div id="ov"><p id="msg"></p><button id="go">スタート</button><p class="help">←→ 移動　↑・Z 回転　↓ 下へ　スペース 一気に落とす<br>スマホ：ボタン・スワイプ・タップ(一気に落とす)</p></div></div>
+<div class="pad"><button data-k="L">←</button><button data-k="U">回転</button><button data-k="D">↓</button><button data-k="A">落とす</button><button data-k="R">→</button></div><a href="index.html">← メニューへもどる</a>
+<script>
+const cv=document.getElementById('c'),g=cv.getContext('2d'),ov=document.getElementById('ov'),msgEl=document.getElementById('msg'),goB=document.getElementById('go');
+const hud=t=>document.getElementById('hud').textContent=t;
+const keys={};let running=false;
+function showOv(m,b){msgEl.innerHTML=m;goB.textContent=b;ov.style.display='flex';running=false}
+goB.onclick=()=>{ov.style.display='none';for(const k in keys)keys[k]=0;start();running=true};
+const KM={ArrowLeft:'L',ArrowRight:'R',ArrowUp:'U',ArrowDown:'D',' ':'A',x:'A',X:'A',z:'B',Z:'B',Enter:'S'};
+addEventListener('keydown',e=>{const k=KM[e.key];if(!k)return;e.preventDefault();if(!running){if(k==='S'||k==='A')goB.click();return}keys[k]=1;press(k)});
+addEventListener('keyup',e=>{const k=KM[e.key];if(k)keys[k]=0});
+document.querySelectorAll('.pad button').forEach(b=>{const k=b.dataset.k;
+const dn=e=>{e.preventDefault();if(!running){goB.click();return}keys[k]=1;press(k)};const up=e=>{e.preventDefault();keys[k]=0};
+b.addEventListener('touchstart',dn,{passive:false});b.addEventListener('mousedown',dn);b.addEventListener('touchend',up);b.addEventListener('touchcancel',up);b.addEventListener('mouseup',up);b.addEventListener('mouseleave',up)});
+let ts0=null;const tx=t=>{const r=cv.getBoundingClientRect();return (t.clientX-r.left)*cv.width/r.width};
+cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];ts0={x:t.clientX,y:t.clientY};if(running&&typeof onTouchX==='function')onTouchX(tx(t))},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();if(running&&typeof onTouchX==='function')onTouchX(tx(e.touches[0]))},{passive:false});
+cv.addEventListener('touchend',e=>{e.preventDefault();if(!ts0||!running)return;const t=e.changedTouches[0],dx=t.clientX-ts0.x,dy=t.clientY-ts0.y;ts0=null;
+if(Math.abs(dx)<15&&Math.abs(dy)<15)press('A');else if(typeof onTouchX!=='function'){press(Math.abs(dx)>Math.abs(dy)?(dx>0?'R':'L'):(dy>0?'D':'U'))}},{passive:false});
+</script>
+<script>
+const P={I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],O:[[1,1],[1,1]],T:[[0,1,0],[1,1,1],[0,0,0]],S:[[0,1,1],[1,1,0],[0,0,0]],Z:[[1,1,0],[0,1,1],[0,0,0]],J:[[1,0,0],[1,1,1],[0,0,0]],L:[[0,0,1],[1,1,1],[0,0,0]]};
+const C={I:'#0ff',O:'#ff0',T:'#c3f',S:'#3f3',Z:'#f33',J:'#36f',L:'#f93'};
+let bd,cur,nxt,score,lines,lvl,acc,lt=0;const S=24;
+function rnd(){const k='IOTSZJL'[Math.random()*7|0];return{m:P[k].map(r=>r.slice()),c:C[k],x:3,y:0}}
+function fits(m,x,y){return m.every((r,i)=>r.every((v,j)=>!v||(x+j>=0&&x+j<10&&y+i<20&&(y+i<0||!bd[y+i][x+j]))))}
+function rot(m){return m[0].map((_,i)=>m.map(r=>r[i]).reverse())}
+function start(){bd=Array.from({length:20},()=>Array(10).fill(0));score=0;lines=0;lvl=1;acc=0;nxt=rnd();spawn();draw()}
+function spawn(){cur=nxt;nxt=rnd();cur.x=cur.m.length==2?4:3;cur.y=0;if(!fits(cur.m,cur.x,cur.y)){draw();showOv('ゲームオーバー<br>スコア '+score,'リトライ')}}
+function lock(){cur.m.forEach((r,i)=>r.forEach((v,j)=>{if(v&&cur.y+i>=0)bd[cur.y+i][cur.x+j]=cur.c}));let n=0;
+for(let y=19;y>=0;y--)if(bd[y].every(v=>v)){bd.splice(y,1);bd.unshift(Array(10).fill(0));n++;y++}
+score+=[0,100,300,500,800][n]*lvl;lines+=n;lvl=1+(lines/10|0);spawn()}
+function down(){if(fits(cur.m,cur.x,cur.y+1)){cur.y++;return true}lock();return false}
+function press(k){if(!running)return;if(k=='L'&&fits(cur.m,cur.x-1,cur.y))cur.x--;if(k=='R'&&fits(cur.m,cur.x+1,cur.y))cur.x++;
+if(k=='U'||k=='B'){const m=rot(cur.m);for(const o of[0,-1,1,-2,2])if(fits(m,cur.x+o,cur.y)){cur.m=m;cur.x+=o;break}}
+if(k=='D'){if(down())score+=1;acc=0}if(k=='A'){while(fits(cur.m,cur.x,cur.y+1)){cur.y++;score+=2}lock();acc=0}if(running)draw()}
+function loop(t){requestAnimationFrame(loop);const dt=t-lt;lt=t;if(!running)return;acc+=dt;if(acc>Math.max(80,800-(lvl-1)*70)){acc=0;down();if(running)draw()}}
+function cell(x,y,c,s=S){g.fillStyle=c;g.fillRect(x,y,s-1,s-1);g.fillStyle='rgba(255,255,255,.45)';g.fillRect(x,y,s-1,3);g.fillRect(x,y,3,s-1);g.fillStyle='rgba(0,0,0,.35)';g.fillRect(x+s-4,y,3,s-1);g.fillRect(x,y+s-4,s-1,3)}
+function draw(){g.fillStyle='#000';g.fillRect(0,0,340,480);g.fillStyle='#111';for(let x=0;x<10;x++)for(let y=0;y<20;y++)g.fillRect(x*S+11,y*S+11,2,2);
+bd.forEach((r,y)=>r.forEach((c,x)=>c&&cell(x*S,y*S,c)));let gy=cur.y;while(fits(cur.m,cur.x,gy+1))gy++;
+cur.m.forEach((r,i)=>r.forEach((v,j)=>{if(v){g.strokeStyle=cur.c;g.strokeRect((cur.x+j)*S+2,(gy+i)*S+2,S-5,S-5);if(cur.y+i>=0)cell((cur.x+j)*S,(cur.y+i)*S,cur.c)}}));
+g.fillStyle='#33f';g.fillRect(240,0,4,480);g.fillStyle='#ff0';g.font='16px monospace';g.textAlign='left';g.fillText('つぎ',256,30);
+nxt.m.forEach((r,i)=>r.forEach((v,j)=>v&&cell(256+j*18,44+i*18,nxt.c,18)));
+g.fillStyle='#0ff';[['スコア',score],['ライン',lines],['レベル',lvl]].forEach(([a,b],i)=>{g.fillText(a,256,150+i*60);g.fillStyle='#fff';g.fillText(b,256,172+i*60);g.fillStyle='#0ff'});
+hud('スコア '+score+'  レベル '+lvl)}
+showOv('テトリス風<br>ブロックをそろえて<br>ラインを消そう','スタート');requestAnimationFrame(loop);
+
+</script></body></html>

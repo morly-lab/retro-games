@@ -1,0 +1,76 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><title>パックマン風</title><style>
+body{margin:0;background:#000;color:#fff;font-family:"Courier New",monospace;display:flex;flex-direction:column;align-items:center;touch-action:none;user-select:none;-webkit-user-select:none}
+h1{color:#ff0;font-size:22px;margin:8px;text-shadow:3px 3px #f0f;letter-spacing:2px}
+#hud{color:#0ff;margin:4px;font-size:16px;min-height:20px}
+#wrap{position:relative}
+canvas{display:block;background:#000;border:4px solid #33f;image-rendering:pixelated;max-width:94vw;max-height:62vh;touch-action:none}
+#ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:rgba(0,0,0,.8);text-align:center;padding:8px;box-sizing:border-box}
+#msg{color:#ff0;font-size:20px;line-height:1.6}
+button{font-family:inherit;font-size:18px;background:#111;color:#ff0;border:3px solid #f0f;padding:10px 14px;margin:3px;border-radius:0}
+button:active{background:#f0f;color:#000}
+.pad{display:flex;gap:4px;margin:6px;flex-wrap:wrap;justify-content:center}
+.help{font-size:12px;color:#aaa;line-height:1.6}
+a{color:#0f0;margin:6px}
+</style></head><body><h1>パックマン風</h1><div id="hud"></div><div id="wrap"><canvas id="c" width="380" height="440"></canvas><div id="ov"><p id="msg"></p><button id="go">スタート</button><p class="help">矢印キー / スワイプ / 画面ボタンで移動</p></div></div>
+<div class="pad"><button data-k="L">←</button><button data-k="U">↑</button><button data-k="D">↓</button><button data-k="R">→</button></div><a href="index.html">← メニューへもどる</a>
+<script>
+const cv=document.getElementById('c'),g=cv.getContext('2d'),ov=document.getElementById('ov'),msgEl=document.getElementById('msg'),goB=document.getElementById('go');
+const hud=t=>document.getElementById('hud').textContent=t;
+const keys={};let running=false;
+function showOv(m,b){msgEl.innerHTML=m;goB.textContent=b;ov.style.display='flex';running=false}
+goB.onclick=()=>{ov.style.display='none';for(const k in keys)keys[k]=0;start();running=true};
+const KM={ArrowLeft:'L',ArrowRight:'R',ArrowUp:'U',ArrowDown:'D',' ':'A',x:'A',X:'A',z:'B',Z:'B',Enter:'S'};
+addEventListener('keydown',e=>{const k=KM[e.key];if(!k)return;e.preventDefault();if(!running){if(k==='S'||k==='A')goB.click();return}keys[k]=1;press(k)});
+addEventListener('keyup',e=>{const k=KM[e.key];if(k)keys[k]=0});
+document.querySelectorAll('.pad button').forEach(b=>{const k=b.dataset.k;
+const dn=e=>{e.preventDefault();if(!running){goB.click();return}keys[k]=1;press(k)};const up=e=>{e.preventDefault();keys[k]=0};
+b.addEventListener('touchstart',dn,{passive:false});b.addEventListener('mousedown',dn);b.addEventListener('touchend',up);b.addEventListener('touchcancel',up);b.addEventListener('mouseup',up);b.addEventListener('mouseleave',up)});
+let ts0=null;const tx=t=>{const r=cv.getBoundingClientRect();return (t.clientX-r.left)*cv.width/r.width};
+cv.addEventListener('touchstart',e=>{e.preventDefault();const t=e.touches[0];ts0={x:t.clientX,y:t.clientY};if(running&&typeof onTouchX==='function')onTouchX(tx(t))},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();if(running&&typeof onTouchX==='function')onTouchX(tx(e.touches[0]))},{passive:false});
+cv.addEventListener('touchend',e=>{e.preventDefault();if(!ts0||!running)return;const t=e.changedTouches[0],dx=t.clientX-ts0.x,dy=t.clientY-ts0.y;ts0=null;
+if(Math.abs(dx)<15&&Math.abs(dy)<15)press('A');else if(typeof onTouchX!=='function'){press(Math.abs(dx)>Math.abs(dy)?(dx>0?'R':'L'):(dy>0?'D':'U'))}},{passive:false});
+</script>
+<script>
+const MAP=["###################","#........#........#","#o##.###.#.###.##o#","#.................#","#.##.#.#####.#.##.#","#....#...#...#....#","####.### # ###.####","   #.#   G   #.#   ","####.# ##-## #.####","    .  #GGG#  .    ","####.# ##### #.####","   #.#       #.#   ","####.# ##### #.####","#........#........#","#.##.###.#.###.##.#","#o.#.....P.....#.o#","##.#.#.#####.#.#.##","#....#...#...#....#","#.######.#.######.#","#.................#","###################"];
+const MW=19,MH=21,T=20,D={L:[-1,0],R:[1,0],U:[0,-1],D:[0,1]};
+let dots,pac,gh,score,lives,lvl,fr,frN,dead,tm,lt=0,left;
+const wall=(x,y,gst)=>{if(y<0||y>=MH)return true;x=(x+MW)%MW;const c=MAP[y][x];return c=='#'||(c=='-'&&!gst)};
+function start(){score=0;lives=3;lvl=1;newLevel()}
+function newLevel(){dots=MAP.map(r=>r.split('').map(c=>c=='.'?1:c=='o'?2:0));left=dots.flat().filter(v=>v).length;reset()}
+function reset(){pac={x:9,y:15,px:9,py:15,d:[0,0],nd:[0,0],a:0,t:0};
+gh=[[9,7,'#f33',0],[8,9,'#fbf',3],[9,9,'#0ff',6],[10,9,'#fb5',9]].map(([x,y,c,w],i)=>({x,y,px:x,py:y,c,i,d:[0,-1],t:0,wait:w*1000/lvl,eyes:0}));fr=0;tm=0;dead=0}
+function press(k){if(D[k])pac.nd=D[k]}
+function inHouse(o){return o.y>=8&&o.y<=9&&o.x>=8&&o.x<=10}
+function stepPac(){pac.px=pac.x;pac.py=pac.y;const[nx,ny]=pac.nd;if(!wall(pac.x+nx,pac.y+ny))pac.d=pac.nd;const[dx,dy]=pac.d;
+if(!wall(pac.x+dx,pac.y+dy)){pac.x=(pac.x+dx+MW)%MW;pac.y+=dy}const v=dots[pac.y][pac.x];
+if(v){dots[pac.y][pac.x]=0;left--;score+=v==1?10:50;if(v==2){fr=7000/Math.sqrt(lvl);frN=0;gh.forEach(o=>{if(!o.eyes)o.d=[-o.d[0],-o.d[1]]})}}}
+function stepGhost(o){o.px=o.x;o.py=o.y;let tgt;
+if(o.eyes){tgt=[9,9];if(o.x==9&&o.y==9){o.eyes=0}}else if(inHouse(o))tgt=[9,7];
+else if(o.i==1)tgt=[pac.x+pac.d[0]*4,pac.y+pac.d[1]*4];else if(o.i==3&&Math.hypot(o.x-pac.x,o.y-pac.y)<6)tgt=[0,20];else tgt=[pac.x,pac.y];
+const opts=Object.values(D).filter(([dx,dy])=>!(dx==-o.d[0]&&dy==-o.d[1])&&!wall(o.x+dx,o.y+dy,o.eyes||inHouse(o)||(o.y==8&&o.x==9)));
+if(!opts.length)opts.push([-o.d[0],-o.d[1]]);let ch;
+if(fr>0&&!o.eyes&&!inHouse(o)||(!o.eyes&&!inHouse(o)&&Math.random()<0.15))ch=opts[Math.random()*opts.length|0];
+else ch=opts.reduce((b,d)=>{const s=Math.hypot(o.x+d[0]-tgt[0],o.y+d[1]-tgt[1]);return s<b[0]?[s,d]:b},[1e9,opts[0]])[1];
+o.d=ch;o.x=(o.x+ch[0]+MW)%MW;o.y+=ch[1]}
+function hit(){for(const o of gh){if(o.eyes||o.wait>0)continue;if((o.x==pac.x&&o.y==pac.y)||(o.x==pac.px&&o.y==pac.py&&o.px==pac.x&&o.py==pac.y)){
+if(fr>0){o.eyes=1;frN++;score+=200*Math.pow(2,frN-1)}else{dead=1500;lives--;return}}}}
+function loop(t){requestAnimationFrame(loop);let dt=Math.min(50,t-lt);lt=t;if(!running)return;
+if(dead>0){dead-=dt;if(dead<=0){if(lives<=0){draw();showOv('ゲームオーバー<br>スコア '+score,'リトライ');return}reset()}draw();return}
+if(fr>0)fr-=dt;const ps=Math.max(90,150-lvl*8);pac.t+=dt;if(pac.t>=ps){pac.t-=ps;stepPac();hit()}
+for(const o of gh){if(o.wait>0){o.wait-=dt;continue}const s=o.eyes?70:fr>0?260:Math.max(110,175-lvl*10);o.t+=dt;if(o.t>=s){o.t-=s;stepGhost(o);hit()}}
+if(left<=0){lvl++;newLevel()}pac.a+=dt;draw()}
+function lerp(o,s){let f=Math.min(1,o.t/s);if(Math.abs(o.x-o.px)>1)f=1;return[(o.px+(o.x-o.px)*f)*T+T/2,(o.py+(o.y-o.py)*f)*T+T/2]}
+function draw(){g.fillStyle='#000';g.fillRect(0,0,380,440);
+for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){const c=MAP[y][x];if(c=='#'){g.fillStyle='#22d';g.fillRect(x*T+1,y*T+1,T-2,T-2);g.fillStyle='#000';g.fillRect(x*T+5,y*T+5,T-10,T-10)}else if(c=='-'){g.fillStyle='#fbf';g.fillRect(x*T,y*T+8,T,4)}
+const v=dots[y][x];g.fillStyle='#fca';if(v==1)g.fillRect(x*T+8,y*T+8,4,4);if(v==2&&(lt/200|0)%2)g.fillRect(x*T+4,y*T+4,12,12)}
+const ps=Math.max(90,150-lvl*8);const[cx,cy]=lerp(pac,ps);const ang=Math.atan2(pac.d[1],pac.d[0]);let m=dead>0?Math.min(3.1,(1500-dead)/400):Math.abs(Math.sin(pac.a/90))*0.8;
+g.fillStyle='#ff0';g.beginPath();g.moveTo(cx,cy);g.arc(cx,cy,9,ang+m/2,ang-m/2+Math.PI*2);g.fill();
+if(!dead)gh.forEach(o=>{const s=o.eyes?70:fr>0?260:Math.max(110,175-lvl*10);const[x,y]=lerp(o,s);
+if(!o.eyes){g.fillStyle=fr>0?(fr<2000&&(lt/150|0)%2?'#fff':'#22f'):o.c;g.beginPath();g.arc(x,y-1,9,Math.PI,0);g.lineTo(x+9,y+9);for(let i=0;i<4;i++)g.lineTo(x+9-i*6-3,y+(i%2?9:5));g.lineTo(x-9,y+9);g.fill()}
+g.fillStyle='#fff';g.fillRect(x-6,y-5,5,6);g.fillRect(x+1,y-5,5,6);g.fillStyle='#00f';g.fillRect(x-5+o.d[0]*2,y-3+o.d[1]*2,3,3);g.fillRect(x+2+o.d[0]*2,y-3+o.d[1]*2,3,3)});
+g.fillStyle='#ff0';for(let i=0;i<lives;i++){g.beginPath();g.moveTo(20+i*24,428);g.arc(20+i*24,428,8,0.6,5.7);g.fill()}
+g.fillStyle='#fff';g.font='14px monospace';g.textAlign='right';g.fillText('ステージ '+lvl,370,432);hud('スコア '+score+'  のこり '+lives)}
+showOv('パックマン風<br>ドットを全部食べよう！<br>大きいエサでゴーストを食べられるよ','スタート');requestAnimationFrame(loop);
+
+</script></body></html>
