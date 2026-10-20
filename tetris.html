@@ -12,13 +12,27 @@ button:active{background:#f0f;color:#000}
 .help{font-size:12px;color:#aaa;line-height:1.6}
 a{color:#0f0;margin:6px}
 </style></head><body><h1>テトリス風</h1><div id="hud"></div><div id="wrap"><canvas id="c" width="340" height="480"></canvas><div id="ov"><p id="msg"></p><button id="go">スタート</button><p class="help">←→ 移動　↑・Z 回転　↓ 下へ　スペース 一気に落とす<br>スマホ：ボタン・スワイプ・タップ(一気に落とす)</p></div></div>
-<div class="pad"><button data-k="L">←</button><button data-k="U">回転</button><button data-k="D">↓</button><button data-k="A">落とす</button><button data-k="R">→</button></div><a href="index.html">← メニューへもどる</a>
+<div class="pad"><button data-k="L">←</button><button data-k="U">回転</button><button data-k="D">↓</button><button data-k="A">落とす</button><button data-k="R">→</button></div><button id="mute" style="font-size:14px;padding:6px 10px">♪ON</button><a href="index.html">← メニューへもどる</a>
 <script>
 const cv=document.getElementById('c'),g=cv.getContext('2d'),ov=document.getElementById('ov'),msgEl=document.getElementById('msg'),goB=document.getElementById('go');
 const hud=t=>document.getElementById('hud').textContent=t;
 const keys={};let running=false;
-function showOv(m,b){msgEl.innerHTML=m;goB.textContent=b;ov.style.display='flex';running=false}
-goB.onclick=()=>{ov.style.display='none';for(const k in keys)keys[k]=0;start();running=true};
+function showOv(m,b){if(b==='リトライ'){bgmStop();sfx('die')}msgEl.innerHTML=m;goB.textContent=b;ov.style.display='flex';running=false}
+goB.onclick=()=>{ov.style.display='none';for(const k in keys)keys[k]=0;ac();start();running=true;bgmStart()};
+
+let AUD=null,bgmOn=localStorage.getItem('retroBgm')!=='0',bgmT=null,bgmStep=0,bgmNext=0;
+const mb=document.getElementById('mute');const upd=()=>mb.textContent=bgmOn?'♪ON':'♪OFF';upd();
+function ac(){if(!AUD){try{AUD=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AUD&&AUD.state==='suspended')AUD.resume();return AUD}
+function tone(f,t,d,type,v){const a=AUD;if(!a||!f)return;const o=a.createOscillator(),gn=a.createGain();o.type=type;o.frequency.value=f;gn.gain.setValueAtTime(v,t);gn.gain.exponentialRampToValueAtTime(0.0001,t+d);o.connect(gn).connect(a.destination);o.start(t);o.stop(t+d+0.02)}
+const mf=n=>n?440*Math.pow(2,(n-69)/12):0;
+function bgmStart(){if(!bgmOn||!ac()||typeof SONG==='undefined')return;bgmStop();bgmStep=0;bgmNext=AUD.currentTime+0.05;
+bgmT=setInterval(()=>{const sp=60/SONG.bpm/2;while(bgmNext<AUD.currentTime+0.2){const i=bgmStep%SONG.m.length;tone(mf(SONG.m[i]),bgmNext,sp*0.9,'square',0.035);const b=SONG.b[i%SONG.b.length];tone(mf(b),bgmNext,sp*0.95,'triangle',0.07);bgmNext+=sp;bgmStep++}},50)}
+function bgmStop(){if(bgmT){clearInterval(bgmT);bgmT=null}}
+const SFX={eat:[[880,.05],[1320,.05]],hit:[[660,.04]],clear:[[523,.06],[659,.06],[784,.06],[1047,.1]],shot:[[1200,.03],[800,.04]],boom:[[160,.15]],die:[[400,.1],[300,.1],[200,.2]]};
+let sfxLast=0;function sfx(n){if(!bgmOn||!AUD)return;const now=AUD.currentTime;if(n==='eat'&&now-sfxLast<0.07)return;sfxLast=now;let t=now;for(const[f,d]of SFX[n]){tone(f,t,d,n==='boom'?'sawtooth':'square',0.05);t+=d}}
+function toggleBgm(){bgmOn=!bgmOn;localStorage.setItem('retroBgm',bgmOn?'1':'0');upd();if(bgmOn&&running)bgmStart();else bgmStop()}
+mb.onclick=e=>{e.preventDefault();ac();toggleBgm();mb.blur()};
+addEventListener('keydown',e=>{if(e.key==='m'||e.key==='M')toggleBgm()});
 const KM={ArrowLeft:'L',ArrowRight:'R',ArrowUp:'U',ArrowDown:'D',' ':'A',x:'A',X:'A',z:'B',Z:'B',Enter:'S'};
 addEventListener('keydown',e=>{const k=KM[e.key];if(!k)return;e.preventDefault();if(!running){if(k==='S'||k==='A')goB.click();return}keys[k]=1;press(k)});
 addEventListener('keyup',e=>{const k=KM[e.key];if(k)keys[k]=0});
@@ -32,6 +46,7 @@ cv.addEventListener('touchend',e=>{e.preventDefault();if(!ts0||!running)return;c
 if(Math.abs(dx)<15&&Math.abs(dy)<15)press('A');else if(typeof onTouchX!=='function'){press(Math.abs(dx)>Math.abs(dy)?(dx>0?'R':'L'):(dy>0?'D':'U'))}},{passive:false});
 </script>
 <script>
+const SONG={bpm:140,m:[69,72,76,0,74,72,71,0,72,76,79,0,77,76,74,0,76,74,72,71,69,0,71,72,74,0,72,71,69,0,0,0],b:[45,52,45,52,48,55,48,55,41,48,41,48,43,50,45,52]};
 const P={I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],O:[[1,1],[1,1]],T:[[0,1,0],[1,1,1],[0,0,0]],S:[[0,1,1],[1,1,0],[0,0,0]],Z:[[1,1,0],[0,1,1],[0,0,0]],J:[[1,0,0],[1,1,1],[0,0,0]],L:[[0,0,1],[1,1,1],[0,0,0]]};
 const C={I:'#0ff',O:'#ff0',T:'#c3f',S:'#3f3',Z:'#f33',J:'#36f',L:'#f93'};
 let bd,cur,nxt,score,lines,lvl,acc,lt=0;const S=24;
@@ -42,7 +57,7 @@ function start(){bd=Array.from({length:20},()=>Array(10).fill(0));score=0;lines=
 function spawn(){cur=nxt;nxt=rnd();cur.x=cur.m.length==2?4:3;cur.y=0;if(!fits(cur.m,cur.x,cur.y)){draw();showOv('ゲームオーバー<br>スコア '+score,'リトライ')}}
 function lock(){cur.m.forEach((r,i)=>r.forEach((v,j)=>{if(v&&cur.y+i>=0)bd[cur.y+i][cur.x+j]=cur.c}));let n=0;
 for(let y=19;y>=0;y--)if(bd[y].every(v=>v)){bd.splice(y,1);bd.unshift(Array(10).fill(0));n++;y++}
-score+=[0,100,300,500,800][n]*lvl;lines+=n;lvl=1+(lines/10|0);spawn()}
+score+=[0,100,300,500,800][n]*lvl;lines+=n;if(n)sfx('clear');lvl=1+(lines/10|0);spawn()}
 function down(){if(fits(cur.m,cur.x,cur.y+1)){cur.y++;return true}lock();return false}
 function press(k){if(!running)return;if(k=='L'&&fits(cur.m,cur.x-1,cur.y))cur.x--;if(k=='R'&&fits(cur.m,cur.x+1,cur.y))cur.x++;
 if(k=='U'||k=='B'){const m=rot(cur.m);for(const o of[0,-1,1,-2,2])if(fits(m,cur.x+o,cur.y)){cur.m=m;cur.x+=o;break}}
